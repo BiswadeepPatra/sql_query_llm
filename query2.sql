@@ -18,7 +18,7 @@ FROM (
 WHERE base_query.sale_id IN (
     SELECT sale_id
     FROM workspace.sql_optimizer_tests.sales
-    WHERE YEAR(sale_date) = 2020
+    WHERE YEAR(sale_date) = 2024
 )
 ORDER BY base_query.sale_date DESC,
          base_query.amount DESC;
