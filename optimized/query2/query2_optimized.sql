@@ -19,12 +19,12 @@
       AND e.country = 'USA'
       AND s.amount > 5000.00
       AND d.dept_name LIKE '%engineering%'
-    INTERSECT
-    SELECT 
-      s.sale_id
-    FROM workspace.sql_optimizer_tests.sales s
-    WHERE s.sale_date >= '2024-01-01'
-      AND s.sale_date < '2025-01-01'
+      AND s.sale_id IN (
+        SELECT sale_id
+        FROM workspace.sql_optimizer_tests.sales
+        WHERE sale_date >= '2024-01-01'
+          AND sale_date < '2025-01-01'
+      )
     ORDER BY s.sale_date DESC,
              s.amount DESC;
   
