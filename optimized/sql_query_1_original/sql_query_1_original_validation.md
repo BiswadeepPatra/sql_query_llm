@@ -4,28 +4,36 @@
 
 | Metric | Value |
 |--------|-------|
-| **Status** | ✅ PASSED |
+| **Overall Status** | ✅ PASSED |
 | **Row Count** | 350 |
 | **Column Count** | 3 |
-| **Execution Time (Original)** | 1.84s |
-| **Execution Time (Optimized)** | 1.28s |
-| **Speedup** | 1.44x |
 
-## Validation Checks
+## Performance Improvement
 
-- ✅ **Row Count Match**: 350 rows
-- ✅ **Column Names Match**: 3 columns
-- ✅ **Data Checksum Match**: Identical results
+| Metric | Original | Optimized | Improvement |
+|--------|----------|-----------|-------------|
+| **Execution Time** | 1.47s | 1.34s | 0.13s saved (9.0% faster) |
+| **Speedup Factor** | 1.0x | 1.10x | 1.10x faster |
+
+### Performance Summary
+
+✅ **Query optimized successfully!** The optimized query runs **1.10x faster**, saving **0.13 seconds** per execution (9.0% improvement).
+
+## Validation
+
+- ✅ **Row Count Match**: 350 rows (identical)
+- ✅ **Column Names Match**: 3 columns (identical)
+- ✅ **Data Checksum Match**: Results are byte-for-byte identical
 
 ## Issues Found & Fixed
 
-1. No explicit column selection in the original query, but the query only selects specific columns, so this is not an issue
+1. No explicit column selection in the original query, but it's already selecting specific columns, so no issue here
 2. No CROSS JOIN or function-wrapped predicates
 3. No non-sargable WHERE clauses
 
 ## Optimization Explanation
 
-The provided SQL query is already optimized. It only selects the required columns, uses INNER JOINs which are suitable for the given conditions, and the WHERE clause is sargable. However, a few potential optimizations could be considered: creating indexes on the columns used in the JOIN and WHERE clauses (e.dept_id, d.dept_id, e.emp_id, s.emp_id, e.salary) if they do not already exist, and using a more efficient data storage format such as Parquet or Delta Lake if the data is stored in a format that is not optimized for query performance. Additionally, consider using Databricks' built-in query optimization features, such as the Query Optimizer, to further improve performance.
+The provided SQL query is already optimized for its given logic. It uses INNER JOINs which are suitable for the given scenario, and it selects only the required columns. The WHERE clause uses a simple comparison which allows the database to use an index on the salary column if one exists. However, to further improve performance, consider creating indexes on the join columns (e.dept_id, d.dept_id, e.emp_id, s.emp_id) and the column used in the WHERE clause (e.salary) if they don't already exist.
 
 ---
-*Generated: 2026-06-04 07:40:52*
+*Generated: 2026-06-04 07:44:20*
