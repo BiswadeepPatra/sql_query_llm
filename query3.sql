@@ -2,7 +2,7 @@
 -- Purpose: Analyze employee performance with department rankings
 -- Uses multiple redundant CTEs and aggregations
 
--- CTE 1: Calculate employee total sales (redundant - recalculated multiple times)
+-- CTE 1: Calculate employee total sales
 WITH employee_totals AS (
     SELECT 
         e.emp_id,
@@ -16,7 +16,7 @@ WITH employee_totals AS (
     WHERE YEAR(s.sale_date) = 2024
     GROUP BY e.emp_id, e.emp_name, e.dept_id, e.country
 ),
--- CTE 2: Calculate department averages (could be combined with above)
+-- CTE 2: Calculate department averages
 dept_averages AS (
     SELECT 
         e.dept_id,
@@ -27,17 +27,19 @@ dept_averages AS (
     WHERE YEAR(s.sale_date) = 2024
     GROUP BY e.dept_id
 ),
--- CTE 3: Rank employees within departments (expensive window function)
+-- CTE 3: Rank employees within departments
 employee_ranks AS (
     SELECT 
         emp_id,
         emp_name,
         dept_id,
+        country,
         total_sales,
+        num_sales,
         RANK() OVER (PARTITION BY dept_id ORDER BY total_sales DESC) as dept_rank
     FROM employee_totals
 ),
--- CTE 4: Get department info (could be joined directly)
+-- CTE 4: Get department info
 dept_info AS (
     SELECT 
         dept_id,
@@ -64,7 +66,6 @@ SELECT DISTINCT
 FROM employee_ranks er
 INNER JOIN dept_info di ON CONCAT(CAST(er.dept_id AS STRING), '') = CONCAT(CAST(di.dept_id AS STRING), '')
 INNER JOIN dept_averages da ON CONCAT(CAST(er.dept_id AS STRING), '') = CONCAT(CAST(da.dept_id AS STRING), '')
-INNER JOIN employee_totals et ON CONCAT(CAST(er.emp_id AS STRING), '') = CONCAT(CAST(et.emp_id AS STRING), '')
 WHERE UPPER(er.country) = 'USA'
   AND LOWER(di.dept_name) LIKE '%engineering%'
   AND CAST(er.total_sales AS DECIMAL(10,2)) > 1000
