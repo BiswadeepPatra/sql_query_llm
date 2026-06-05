@@ -1,1 +1,1 @@
-SELECT e.emp_name, d.dept_name, s.product FROM workspace.sql_optimizer_tests.employees e INNER JOIN workspace.sql_optimizer_tests.sales s ON e.emp_id = s.emp_id INNER JOIN workspace.sql_optimizer_tests.departments d ON e.dept_id = d.dept_id WHERE e.salary > 80000
+SELECT e.emp_name, d.dept_name, s.product FROM (SELECT * FROM workspace.sql_optimizer_tests.employees WHERE salary > 80000) e INNER JOIN workspace.sql_optimizer_tests.departments d ON e.dept_id = d.dept_id INNER JOIN workspace.sql_optimizer_tests.sales s ON e.emp_id = s.emp_id
