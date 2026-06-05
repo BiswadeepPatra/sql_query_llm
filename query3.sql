@@ -20,5 +20,4 @@ WHERE CONCAT(CAST(s.emp_id AS STRING), '') = CONCAT(CAST(e.emp_id AS STRING), ''
   AND UPPER(e.country) = 'USA'
   AND LOWER(d.dept_name) LIKE '%engineering%'
   AND CAST(s.amount AS DECIMAL(10,2)) > 5000
-ORDER BY 
-    CAST(s.amount AS DECIMAL(10,2)) DESC;
+ORDER BY sale_amount DESC;
