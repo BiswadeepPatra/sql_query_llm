@@ -44,6 +44,6 @@ WHERE base.sale_id IN (
   AND LOWER(base.department) LIKE '%engineering%'
   AND CAST(base.salary AS DECIMAL(10,2)) > 50000
 ORDER BY 
-    YEAR(base.hire_year) DESC,
-    MONTH(base.hire_month) DESC,
+    base.hire_year DESC,
+    base.hire_month DESC,
     base.sale_amount DESC;
