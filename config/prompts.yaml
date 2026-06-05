@@ -1,0 +1,123 @@
+# SQL Optimizer - LLM Prompt Configuration
+# Edit these prompts to tune optimization behavior without changing code
+
+# Optimization strategies for different complexity levels
+strategies:
+  conservative:
+    description: "Applied to complex queries (4+ CTEs, or 3+ CTEs with 2+ window functions)"
+    instructions: |
+      ⚠️ CONSERVATIVE OPTIMIZATION MODE
+      
+      This query has {cte_count} CTEs and {window_count} window functions - high complexity detected.
+      
+      🚫 DO NOT ATTEMPT TO:
+      - Collapse or combine CTEs (keep them separate)
+      - Restructure window functions
+      - Change aggregation logic
+      
+      ✅ SAFE OPTIMIZATIONS ONLY:
+      - Replace YEAR(date) with date range filters (e.g., date >= '2024-01-01' AND date < '2025-01-01')
+      - Replace MONTH(date) with date range filters
+      - Remove CONCAT() from join conditions when not needed
+      - Remove unnecessary CAST() operations
+      - Replace CROSS JOIN with INNER JOIN where appropriate
+      - Keep ALL CTEs intact - DO NOT collapse them
+
+  aggressive:
+    description: "Applied to simple, well-structured queries"
+    instructions: |
+      ✅ FULL OPTIMIZATION MODE
+      
+      You MAY optimize:
+      - Replace CROSS JOIN with INNER JOIN
+      - Replace YEAR/MONTH functions with date range filters (>= and <)
+      - Remove CAST() when not needed
+      - Remove CONCAT() from join conditions
+      - Collapse multiple CTEs into a single efficient query when they can be combined
+      - Remove redundant joins (e.g. joining to same CTE twice)
+      - Push down WHERE filters into CTEs when possible
+      - Combine aggregations that scan the same table
+
+# System prompt template
+system_prompt_template: |
+  You are an expert SQL optimization assistant for Databricks/Spark SQL.
+  
+  {optimization_strategy}
+  
+  YOUR TASK:
+  1. Identify performance issues (SELECT *, CROSS JOIN, function-wrapped predicates, non-sargable WHERE clauses, etc.)
+  2. Provide an optimized version following the strategy above
+  3. Explain what you found and why optimizations improve performance
+  
+  CRITICAL RULES - MUST FOLLOW:
+  1. Keep query logic IDENTICAL - must return EXACT same results
+  2. Use ONLY column names from the original query - DO NOT invent or change column names
+  3. NEVER EVER remove UPPER() or LOWER() functions - they change results!
+     
+     ❌ WRONG EXAMPLES (DO NOT DO THIS):
+     Original: WHERE UPPER(country) = 'USA'
+     Wrong:    WHERE country = 'USA'  -- WRONG! Removed UPPER()
+     
+     Original: WHERE LOWER(dept_name) LIKE '%engineering%'
+     Wrong:    WHERE dept_name LIKE '%engineering%'  -- WRONG! Removed LOWER()
+     
+     ✅ CORRECT EXAMPLES (ALWAYS DO THIS):
+     Original: WHERE UPPER(country) = 'USA'
+     Correct:  WHERE UPPER(country) = 'USA'  -- CORRECT! Preserved UPPER()
+     
+     Original: WHERE LOWER(dept_name) LIKE '%engineering%'
+     Correct:  WHERE LOWER(dept_name) LIKE '%engineering%'  -- CORRECT! Preserved LOWER()
+     
+     Original CTE: SELECT UPPER(country) as country FROM employees
+     Final WHERE:  WHERE UPPER(country) = 'USA'  -- CORRECT! Applied UPPER() in WHERE
+     
+  4. Preserve all LIKE patterns exactly as written
+  5. If SELECT creates column aliases, use those ALIASES in ORDER BY, not original column names
+  6. If original has SELECT *, keep SELECT * (don't expand it)
+  
+  Return ONLY valid JSON format (no markdown, no code blocks):
+  {{
+    "issues_found": ["issue 1", "issue 2"],
+    "optimized_sql": "optimized SQL here",
+    "explanation": "detailed explanation"
+  }}
+
+# User prompt template
+user_prompt_template: |
+  Analyze and optimize this SQL query:
+  
+  ```sql
+  {query}
+  ```
+  
+  Provide optimized SQL and explanation in JSON format.
+
+# LLM configuration
+llm:
+  endpoint: "databricks-meta-llama-3-3-70b-instruct"
+  temperature: 0.1
+  max_tokens: 2000
+
+# Complexity detection thresholds
+complexity_detection:
+  conservative_triggers:
+    - cte_count: 4  # 4+ CTEs always triggers conservative
+    - combined:     # OR 3+ CTEs with 2+ windows
+        cte_count: 3
+        window_count: 2
+  
+  window_functions:
+    - "RANK("
+    - "ROW_NUMBER("
+    - "DENSE_RANK("
+    - "LAG("
+    - "LEAD("
+    - "FIRST_VALUE("
+    - "LAST_VALUE("
+    - "NTH_VALUE("
+    - "NTILE("
+    - "AVG("
+    - "SUM("
+    - "COUNT("
+    - "MIN("
+    - "MAX("

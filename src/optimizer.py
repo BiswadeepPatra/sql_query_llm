@@ -7,6 +7,14 @@ import time
 import hashlib
 from typing import Dict, Any
 
+# Import prompt loader
+try:
+    from .prompt_loader import load_prompts, format_system_prompt, format_user_prompt, get_llm_config
+    PROMPTS_CONFIG = load_prompts()
+except (ImportError, FileNotFoundError):
+    # Fallback: prompts hardcoded (for backwards compatibility)
+    PROMPTS_CONFIG = None
+
 
 def detect_complex_query(query: str) -> Dict[str, Any]:
     """
@@ -38,7 +46,8 @@ def detect_complex_query(query: str) -> Dict[str, Any]:
     }
 
 
-def optimize_sql(query: str, llm_client, llm_provider: str = "databricks-meta-llama-3-3-70b-instruct") -> Dict[str, Any]:
+def optimize_sql(query: str, llm_client, llm_provider: str = "databricks-meta-llama-3-3-70b-instruct", 
+                 prompts_config: Dict = None) -> Dict[str, Any]:
     """
     Optimize SQL query using Databricks Llama 3.3 70B model.
     
@@ -46,6 +55,7 @@ def optimize_sql(query: str, llm_client, llm_provider: str = "databricks-meta-ll
         query: SQL query to optimize
         llm_client: MLflow deployment client
         llm_provider: LLM endpoint name
+        prompts_config: Optional external prompts configuration (overrides default)
     
     Returns:
         Dictionary with optimization results
@@ -59,12 +69,35 @@ def optimize_sql(query: str, llm_client, llm_provider: str = "databricks-meta-ll
             "optimized_sql": query
         }
     
+    # Use provided config or load from file
+    config = prompts_config or PROMPTS_CONFIG
+    
     # Detect query complexity
     complexity = detect_complex_query(query)
     
-    # Build adaptive system prompt based on complexity
-    if complexity['recommendation'] == 'conservative':
-        optimization_strategy = f"""⚠️ CONSERVATIVE OPTIMIZATION MODE
+    # Build prompts from configuration if available
+    if config:
+        try:
+            system_prompt = format_system_prompt(config, complexity['recommendation'], complexity)
+            user_prompt = format_user_prompt(config, query)
+            llm_config = get_llm_config(config)
+            
+            llm_provider = llm_config.get('endpoint', llm_provider)
+            temperature = llm_config.get('temperature', 0.1)
+            max_tokens = llm_config.get('max_tokens', 2000)
+            
+            print(f"✅ Using prompts from config/prompts.yaml ({complexity['recommendation'].upper()} mode)")
+        except Exception as e:
+            print(f"⚠️ Error loading prompts config: {e}. Using hardcoded prompts.")
+            config = None
+    
+    # Fallback to hardcoded prompts if no config
+    if not config:
+        temperature = 0.1
+        max_tokens = 2000
+        
+        if complexity['recommendation'] == 'conservative':
+            optimization_strategy = f"""⚠️ CONSERVATIVE OPTIMIZATION MODE
 
 This query has {complexity['cte_count']} CTEs and {complexity['window_count']} window functions - high complexity detected.
 
@@ -81,8 +114,8 @@ This query has {complexity['cte_count']} CTEs and {complexity['window_count']} w
 - Replace CROSS JOIN with INNER JOIN where appropriate
 - Keep ALL CTEs intact - DO NOT collapse them
 """
-    else:
-        optimization_strategy = """✅ FULL OPTIMIZATION MODE
+        else:
+            optimization_strategy = """✅ FULL OPTIMIZATION MODE
 
 You MAY optimize:
 - Replace CROSS JOIN with INNER JOIN
@@ -94,8 +127,8 @@ You MAY optimize:
 - Push down WHERE filters into CTEs when possible
 - Combine aggregations that scan the same table
 """
-    
-    system_prompt = f"""You are an expert SQL optimization assistant for Databricks/Spark SQL.
+        
+        system_prompt = f"""You are an expert SQL optimization assistant for Databricks/Spark SQL.
 
 {optimization_strategy}
 
@@ -113,13 +146,13 @@ CRITICAL RULES - MUST FOLLOW:
 6. If original has SELECT *, keep SELECT * (don't expand it)
 
 Return ONLY valid JSON format (no markdown, no code blocks):
-{{{{
+{{
   "issues_found": ["issue 1", "issue 2"],
   "optimized_sql": "optimized SQL here",
   "explanation": "detailed explanation"
-}}}}"""
-    
-    user_prompt = f"""Analyze and optimize this SQL query:
+}}"""
+        
+        user_prompt = f"""Analyze and optimize this SQL query:
 
 ```sql
 {query}
@@ -135,8 +168,8 @@ Provide optimized SQL and explanation in JSON format."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                "temperature": 0.1,
-                "max_tokens": 2000
+                "temperature": temperature,
+                "max_tokens": max_tokens
             }
         )
         result_text = response['choices'][0]['message']['content']
@@ -160,7 +193,8 @@ Provide optimized SQL and explanation in JSON format."""
             "explanation": result.get("explanation", "No explanation provided"),
             "llm_provider": llm_provider,
             "optimization_mode": complexity['recommendation'].upper(),
-            "complexity_details": f"CTEs: {complexity['cte_count']}, Windows: {complexity['window_count']}"
+            "complexity_details": f"CTEs: {complexity['cte_count']}, Windows: {complexity['window_count']}",
+            "prompts_source": "config/prompts.yaml" if config else "hardcoded"
         }
         
         return output
