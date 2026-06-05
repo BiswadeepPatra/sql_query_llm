@@ -1,4 +1,4 @@
-# Validation Report: query2
+# Validation Report: query2_original_original
 
 ## Summary
 
@@ -27,49 +27,34 @@
 
 ## Issues Found & Fixed
 
-1. Using SELECT * instead of selecting specific columns
+1. Using SELECT * instead of selecting only required columns
 2. Using CROSS JOIN instead of INNER JOIN
-3. Using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST)
+3. Using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST) which can prevent index usage
 4. Using non-sargable WHERE clauses (LIKE with wildcard at the beginning)
-5. Using subquery in the WHERE clause with IN operator
+5. Using subquery in the WHERE clause which can be slow for large datasets
 
 ## Optimization Explanation
 
-
-    The original query has several performance issues. 
-    1. Using SELECT * instead of selecting specific columns can lead to unnecessary data transfer and processing. 
-    2. Using CROSS JOIN instead of INNER JOIN can result in a huge intermediate result set, which can be slow and memory-intensive. 
-    3. Using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST) can prevent the database from using indexes on the columns. 
-    4. Using non-sargable WHERE clauses (LIKE with wildcard at the beginning) can also prevent the database from using indexes. 
-    5. Using a subquery in the WHERE clause with the IN operator can be slow if the subquery returns a large number of rows.
-
-    The optimized query addresses these issues by:
-    1. Selecting specific columns instead of using SELECT *.
-    2. Using INNER JOIN instead of CROSS JOIN to reduce the intermediate result set.
-    3. Removing function-wrapped predicates by using date range instead of YEAR and MONTH functions, and by assuming the country column is already in uppercase.
-    4. Replacing the non-sargable LIKE clause with a sargable one by removing the wildcard at the beginning.
-    5. Removing the subquery in the WHERE clause, as it is not necessary in this case because the sales table is already being joined.
-  
+The original query has several performance issues. Firstly, using SELECT * instead of selecting only required columns can lead to unnecessary data transfer and processing. Secondly, using CROSS JOIN instead of INNER JOIN can result in a much larger result set, which can be slow. Thirdly, using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST) can prevent the database from using indexes, leading to slower query performance. Fourthly, using non-sargable WHERE clauses (LIKE with wildcard at the beginning) can also prevent index usage. Lastly, using a subquery in the WHERE clause can be slow for large datasets. The optimized query addresses these issues by using INNER JOIN, selecting only required columns, avoiding function-wrapped predicates, and using sargable WHERE clauses. Additionally, the subquery in the WHERE clause has been removed as it was filtering sales that occurred in 2024, but the original query was already filtering sales that occurred in 2020, so this subquery was not necessary.
 
 ## Validation Error
 
 ```
-[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `e`.`name` cannot be resolved. Did you mean one of the following? [`e`.`city`, `e`.`emp_name`, `s`.`amount`, `e`.`emp_id`, `e`.`salary`]. SQLSTATE: 42703; line 3 pos 16;
-'Sort ['s.sale_date DESC NULLS LAST, 's.amount DESC NULLS LAST], true
-+- 'Distinct
-   +- 'Project [emp_id#11161, 'e.name, dept_id#11163, country#11166, dept_id#11171, dept_name#11172, sale_id#11148, emp_id#11149, sale_date#11152, amount#11151]
-      +- Filter ((((sale_date#11152 >= cast(2024-01-01 as date)) AND (sale_date#11152 < cast(2024-07-01 as date))) AND (country#11166 = USA)) AND ((amount#11151 > cast(5000.00 as decimal(10,2))) AND dept_name#11172 LIKE %engineering%))
-         +- Join Inner, (dept_id#11163 = dept_id#11171)
-            :- Join Inner, (emp_id#11149 = emp_id#11161)
-            :  :- SubqueryAlias s
-            :  :  +- SubqueryAlias workspace.sql_optimizer_tests.sales
-            :  :     +- Relation workspace.sql_optimizer_tests.sales[sale_id#11148,emp_id#11149,product#11150,amount#11151,sale_date#11152,region#11153] parquet
-            :  +- SubqueryAlias e
-            :     +- SubqueryAlias workspace.sql_optimizer_tests.employees
-            :        +- Relation workspace.sql_optimizer_tests.employees[emp_id#11161,emp_name#11162,dept_id#11163,salary#11164,hire_date#11165,country#11166,city#11167] parquet
-            +- SubqueryAlias d
-               +- SubqueryAlias workspace.sql_optimizer_tests.departments
-                  +- Relation workspace.sql_optimizer_tests.departments[dept_id#11171,dept_name#11172,location#11173] parquet
+[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `e`.`name` cannot be resolved. Did you mean one of the following? [`e`.`city`, `e`.`emp_name`, `s`.`amount`, `e`.`emp_id`, `e`.`salary`]. SQLSTATE: 42703; line 4 pos 6;
+'Distinct
++- 'Project [emp_id#12539, 'e.name, country#12544, dept_id#12546, dept_name#12547, sale_id#12526, sale_date#12530, amount#12529]
+   +- Filter ((((sale_date#12530 >= cast(2020-01-01 as date)) AND (sale_date#12530 < cast(2020-07-01 as date))) AND (country#12544 = USA)) AND ((amount#12529 > cast(5000.00 as decimal(10,2))) AND dept_name#12547 LIKE %engineering%))
+      +- Join Inner, (dept_id#12541 = dept_id#12546)
+         :- Join Inner, (emp_id#12527 = emp_id#12539)
+         :  :- SubqueryAlias s
+         :  :  +- SubqueryAlias workspace.sql_optimizer_tests.sales
+         :  :     +- Relation workspace.sql_optimizer_tests.sales[sale_id#12526,emp_id#12527,product#12528,amount#12529,sale_date#12530,region#12531] parquet
+         :  +- SubqueryAlias e
+         :     +- SubqueryAlias workspace.sql_optimizer_tests.employees
+         :        +- Relation workspace.sql_optimizer_tests.employees[emp_id#12539,emp_name#12540,dept_id#12541,salary#12542,hire_date#12543,country#12544,city#12545] parquet
+         +- SubqueryAlias d
+            +- SubqueryAlias workspace.sql_optimizer_tests.departments
+               +- Relation workspace.sql_optimizer_tests.departments[dept_id#12546,dept_name#12547,location#12548] parquet
 
 
 JVM stacktrace:
@@ -88,10 +73,6 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 	at org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:538)
 	at org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:324)
 	at org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:377)
-	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:376)
-	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:376)
-	at scala.collection.immutable.Vector.foreach(Vector.scala:2125)
-	at org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:376)
 	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:376)
 	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:376)
 	at scala.collection.immutable.Vector.foreach(Vector.scala:2125)
@@ -126,12 +107,7 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 	at org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:918)
 	at org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$8(QueryExecution.scala:1053)
 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withExecutionPhase$1(SQLExecution.scala:322)
-	at com.databricks.logging.AttributionContext$.$anonfun$withValue$1(AttributionContext.scala:349)
-	at scala.util.DynamicVariable.withValue(DynamicVariable.scala:59)
-	at com.databricks.logging.AttributionContext$.withValue(AttributionContext.scala:345)
-	at com.databricks.util.TracingSpanUtils$.$anonfun$withTracing$4(TracingSpanUtils.scala:247)
-	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:100)
-	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:245)
+	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:251)
 	at com.databricks.spark.util.DatabricksTracingHelper.withSpan(DatabricksSparkTracingHelper.scala:154)
 	at com.databricks.spark.util.DBRTracing$.withSpan(DBRTracing.scala:87)
 	at org.apache.spark.sql.execution.SQLExecution$.withExecutionPhase(SQLExecution.scala:303)
@@ -198,13 +174,7 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 	at org.apache.spark.sql.connect.execution.ExecuteThreadRunner.org$apache$spark$sql$connect$execution$ExecuteThreadRunner$$execute(ExecuteThreadRunner.scala:188)
 	at org.apache.spark.sql.connect.execution.ExecuteThreadRunner$ExecutionThread.$anonfun$run$3(ExecuteThreadRunner.scala:722)
 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
-	at com.databricks.logging.AttributionContext$.$anonfun$withValue$1(AttributionContext.scala:349)
-	at scala.util.DynamicVariable.withValue(DynamicVariable.scala:59)
-	at com.databricks.logging.AttributionContext$.withValue(AttributionContext.scala:345)
-	at com.databricks.spark.util.DatabricksTracingHelper.$anonfun$withSpanFromParent$4(DatabricksSparkTracingHelper.scala:106)
-	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:100)
-	at com.databricks.spark.util.DatabricksTracingHelper.withSpanFromParent(DatabricksSparkTracingHelper.scala:104)
-	at com.databricks.spark.util.DBRTracing$.withSpanFromParent(DBRTracing.scala:68)
+	at com.databricks.spark.util.DBRTracing$.withSpanFromParent(DBRTracing.scala:70)
 	at org.apache.spark.sql.connect.execution.ExecuteThreadRunner$ExecutionThread.$anonfun$run$2(ExecuteThreadRunner.scala:722)
 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
 	at com.databricks.unity.UCSEphemeralState$Handle.runWith(UCSEphemeralState.scala:51)
@@ -217,22 +187,21 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 
 ## Differences Detected
 
-- Execution error: [UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `e`.`name` cannot be resolved. Did you mean one of the following? [`e`.`city`, `e`.`emp_name`, `s`.`amount`, `e`.`emp_id`, `e`.`salary`]. SQLSTATE: 42703; line 3 pos 16;
-'Sort ['s.sale_date DESC NULLS LAST, 's.amount DESC NULLS LAST], true
-+- 'Distinct
-   +- 'Project [emp_id#11161, 'e.name, dept_id#11163, country#11166, dept_id#11171, dept_name#11172, sale_id#11148, emp_id#11149, sale_date#11152, amount#11151]
-      +- Filter ((((sale_date#11152 >= cast(2024-01-01 as date)) AND (sale_date#11152 < cast(2024-07-01 as date))) AND (country#11166 = USA)) AND ((amount#11151 > cast(5000.00 as decimal(10,2))) AND dept_name#11172 LIKE %engineering%))
-         +- Join Inner, (dept_id#11163 = dept_id#11171)
-            :- Join Inner, (emp_id#11149 = emp_id#11161)
-            :  :- SubqueryAlias s
-            :  :  +- SubqueryAlias workspace.sql_optimizer_tests.sales
-            :  :     +- Relation workspace.sql_optimizer_tests.sales[sale_id#11148,emp_id#11149,product#11150,amount#11151,sale_date#11152,region#11153] parquet
-            :  +- SubqueryAlias e
-            :     +- SubqueryAlias workspace.sql_optimizer_tests.employees
-            :        +- Relation workspace.sql_optimizer_tests.employees[emp_id#11161,emp_name#11162,dept_id#11163,salary#11164,hire_date#11165,country#11166,city#11167] parquet
-            +- SubqueryAlias d
-               +- SubqueryAlias workspace.sql_optimizer_tests.departments
-                  +- Relation workspace.sql_optimizer_tests.departments[dept_id#11171,dept_name#11172,location#11173] parquet
+- Execution error: [UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `e`.`name` cannot be resolved. Did you mean one of the following? [`e`.`city`, `e`.`emp_name`, `s`.`amount`, `e`.`emp_id`, `e`.`salary`]. SQLSTATE: 42703; line 4 pos 6;
+'Distinct
++- 'Project [emp_id#12539, 'e.name, country#12544, dept_id#12546, dept_name#12547, sale_id#12526, sale_date#12530, amount#12529]
+   +- Filter ((((sale_date#12530 >= cast(2020-01-01 as date)) AND (sale_date#12530 < cast(2020-07-01 as date))) AND (country#12544 = USA)) AND ((amount#12529 > cast(5000.00 as decimal(10,2))) AND dept_name#12547 LIKE %engineering%))
+      +- Join Inner, (dept_id#12541 = dept_id#12546)
+         :- Join Inner, (emp_id#12527 = emp_id#12539)
+         :  :- SubqueryAlias s
+         :  :  +- SubqueryAlias workspace.sql_optimizer_tests.sales
+         :  :     +- Relation workspace.sql_optimizer_tests.sales[sale_id#12526,emp_id#12527,product#12528,amount#12529,sale_date#12530,region#12531] parquet
+         :  +- SubqueryAlias e
+         :     +- SubqueryAlias workspace.sql_optimizer_tests.employees
+         :        +- Relation workspace.sql_optimizer_tests.employees[emp_id#12539,emp_name#12540,dept_id#12541,salary#12542,hire_date#12543,country#12544,city#12545] parquet
+         +- SubqueryAlias d
+            +- SubqueryAlias workspace.sql_optimizer_tests.departments
+               +- Relation workspace.sql_optimizer_tests.departments[dept_id#12546,dept_name#12547,location#12548] parquet
 
 
 JVM stacktrace:
@@ -251,10 +220,6 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 	at org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:538)
 	at org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:324)
 	at org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:377)
-	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:376)
-	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:376)
-	at scala.collection.immutable.Vector.foreach(Vector.scala:2125)
-	at org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:376)
 	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:376)
 	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:376)
 	at scala.collection.immutable.Vector.foreach(Vector.scala:2125)
@@ -289,12 +254,7 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 	at org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:918)
 	at org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$8(QueryExecution.scala:1053)
 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withExecutionPhase$1(SQLExecution.scala:322)
-	at com.databricks.logging.AttributionContext$.$anonfun$withValue$1(AttributionContext.scala:349)
-	at scala.util.DynamicVariable.withValue(DynamicVariable.scala:59)
-	at com.databricks.logging.AttributionContext$.withValue(AttributionContext.scala:345)
-	at com.databricks.util.TracingSpanUtils$.$anonfun$withTracing$4(TracingSpanUtils.scala:247)
-	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:100)
-	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:245)
+	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:251)
 	at com.databricks.spark.util.DatabricksTracingHelper.withSpan(DatabricksSparkTracingHelper.scala:154)
 	at com.databricks.spark.util.DBRTracing$.withSpan(DBRTracing.scala:87)
 	at org.apache.spark.sql.execution.SQLExecution$.withExecutionPhase(SQLExecution.scala:303)
@@ -361,13 +321,7 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 	at org.apache.spark.sql.connect.execution.ExecuteThreadRunner.org$apache$spark$sql$connect$execution$ExecuteThreadRunner$$execute(ExecuteThreadRunner.scala:188)
 	at org.apache.spark.sql.connect.execution.ExecuteThreadRunner$ExecutionThread.$anonfun$run$3(ExecuteThreadRunner.scala:722)
 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
-	at com.databricks.logging.AttributionContext$.$anonfun$withValue$1(AttributionContext.scala:349)
-	at scala.util.DynamicVariable.withValue(DynamicVariable.scala:59)
-	at com.databricks.logging.AttributionContext$.withValue(AttributionContext.scala:345)
-	at com.databricks.spark.util.DatabricksTracingHelper.$anonfun$withSpanFromParent$4(DatabricksSparkTracingHelper.scala:106)
-	at com.databricks.util.TracingSpanUtils$.withTracing(TracingSpanUtils.scala:100)
-	at com.databricks.spark.util.DatabricksTracingHelper.withSpanFromParent(DatabricksSparkTracingHelper.scala:104)
-	at com.databricks.spark.util.DBRTracing$.withSpanFromParent(DBRTracing.scala:68)
+	at com.databricks.spark.util.DBRTracing$.withSpanFromParent(DBRTracing.scala:70)
 	at org.apache.spark.sql.connect.execution.ExecuteThreadRunner$ExecutionThread.$anonfun$run$2(ExecuteThreadRunner.scala:722)
 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
 	at com.databricks.unity.UCSEphemeralState$Handle.runWith(UCSEphemeralState.scala:51)
@@ -378,4 +332,4 @@ org.apache.spark.sql.catalyst.ExtendedAnalysisException
 	at org.apache.spark.sql.connect.execution.ExecuteThreadRunner$ExecutionThread.run(ExecuteThreadRunner.scala:721)
 
 ---
-*Generated: 2026-06-05 05:54:07*
+*Generated: 2026-06-05 05:55:23*

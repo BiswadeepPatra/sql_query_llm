@@ -4,43 +4,48 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total SQL Files** | 6 |
+| **Total SQL Files** | 12 |
 | **Passed Validation** | ✅ 3 |
-| **Failed Validation** | ❌ 3 |
-| **Success Rate** | 50.0% |
-| **Average Speedup** | 0.77x |
+| **Failed Validation** | ❌ 9 |
+| **Success Rate** | 25.0% |
+| **Average Speedup** | 0.26x |
 
 ## Detailed Results
 
 | SQL File | Status | Rows | Speedup | Issues Fixed |
 |----------|--------|------|---------|---------------|
-| query2 | ❌ FAILED | 0 | 1.54x | 5 |
-| sql_query_1 | ✅ PASSED | 35000 | 0.94x | 3 |
+| sql_query_1 | ❌ FAILED | N/A | 0.00x | 0 |
+| query2 | ❌ FAILED | 0 | 0.00x | 5 |
+| sql_query_1_original_optimized | ✅ PASSED | 35000 | 0.89x | 2 |
+| sql_query_1_original_original | ❌ FAILED | N/A | 0.00x | 0 |
+| sql_query_1_optimized_original | ✅ PASSED | 35000 | 0.81x | 3 |
+| sql_query_1_optimized_optimized | ✅ PASSED | 35000 | 0.78x | 2 |
+| query2_original | ❌ FAILED | 0 | 0.67x | 5 |
 | query2_optimized | ❌ FAILED | N/A | 0.00x | 0 |
-| query2_original | ❌ FAILED | 0 | 0.44x | 5 |
-| sql_query_1_original | ✅ PASSED | 35000 | 0.88x | 3 |
-| sql_query_1_optimized | ✅ PASSED | 35000 | 0.79x | 2 |
+| query2_original_optimized | ❌ FAILED | N/A | 0.00x | 0 |
+| query2_original_original | ❌ FAILED | 0 | 0.00x | 5 |
+| sql_query_1_optimized | ❌ FAILED | 0 | 0.00x | 2 |
+| sql_query_1_original | ❌ FAILED | N/A | 0.00x | 0 |
 
 ## Common Issues Detected
 
-- **Using SELECT * which can retrieve unnecessary columns** (1 occurrence)
-- **Using CROSS JOIN which can lead to a large result set** (1 occurrence)
-- **Using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST) which can prevent index usage** (1 occurrence)
+- **Using CROSS JOIN instead of INNER JOIN** (3 occurrences)
+- **Using SELECT * instead of selecting specific columns** (2 occurrences)
+- **Using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST)** (2 occurrences)
+- **Using non-sargable WHERE clauses (LIKE with wildcard at the beginning)** (2 occurrences)
+- **SELECT statement is selecting all columns from the joined tables, but only a subset of columns are used** (2 occurrences)
+- **No indexing is specified, which could improve join and filter performance** (2 occurrences)
+- **Using subquery in the WHERE clause with IN operator** (1 occurrence)
+- **SELECT statement is selecting specific columns but could be improved by only selecting necessary columns from the sales table** (1 occurrence)
+- **No indexes are specified on the join columns (e.dept_id, d.dept_id, e.emp_id, s.emp_id) which could improve join performance** (1 occurrence)
+- **No indexes are specified on the column used in the WHERE clause (e.salary) which could improve filter performance** (1 occurrence)
 - **Using non-sargable WHERE clauses (LIKE with a wildcard at the beginning)** (1 occurrence)
-- **Using a subquery in the WHERE clause which can be slow for large tables** (1 occurrence)
-- **No explicit column selection in the subquery is not present but the query can still be optimized** (1 occurrence)
-- **No indexes are present on join columns** (1 occurrence)
-- **No indexes are present on the where clause column** (1 occurrence)
+- **Using a subquery in the WHERE clause instead of a JOIN** (1 occurrence)
 - **Using SELECT * instead of selecting only required columns** (1 occurrence)
-- **Using CROSS JOIN instead of INNER JOIN** (1 occurrence)
-- **Using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST)** (1 occurrence)
-- **Using non-sargable WHERE clauses (LIKE with wildcard at the beginning)** (1 occurrence)
-- **Using subquery in the WHERE clause** (1 occurrence)
-- **No explicit column selection in the original query, but the query only selects specific columns, so this is not an issue in this case** (1 occurrence)
-- **No CROSS JOIN or function-wrapped predicates** (1 occurrence)
-- **No non-sargable WHERE clauses** (1 occurrence)
-- **No explicit column selection in the SELECT clause for the 'sales' table, which could potentially lead to unnecessary data transfer if 'sales' has many columns** (1 occurrence)
-- **No indexing or partitioning information available, which could impact query performance** (1 occurrence)
+- **Using function-wrapped predicates (YEAR, MONTH, UPPER, LOWER, CAST) which can prevent index usage** (1 occurrence)
+- **Using subquery in the WHERE clause which can be slow for large datasets** (1 occurrence)
+- **No indexes on join columns and where clause column** (1 occurrence)
+- **Potential full table scan due to lack of indexes** (1 occurrence)
 
 ---
-*Generated: 2026-06-04 08:45:40*
+*Generated: 2026-06-05 05:55:34*
